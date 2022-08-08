@@ -13,7 +13,7 @@ def handler(event, context):
     r = requests.post(
         SLACK_WEBHOOK_URL,
         json={
-            'text': event['details']['text']
+            'text': event['detail']['text']
         }
     )
     print(r)
