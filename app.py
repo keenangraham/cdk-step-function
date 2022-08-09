@@ -146,7 +146,7 @@ app = App()
 
 StepFunction(
     app,
-    'StepFunction2',
+    'StepFunction',
     env=US_WEST_2,
 )
 
