@@ -1,3 +1,5 @@
+import json
+
 from aws_cdk import App
 from aws_cdk import Stack
 from aws_cdk import Duration
@@ -10,6 +12,7 @@ from aws_cdk.aws_sns import Topic
 
 from aws_cdk.aws_chatbot import SlackChannelConfiguration
 
+from aws_cdk.aws_events import EventBus
 from aws_cdk.aws_events import Rule
 from aws_cdk.aws_events import EventPattern
 
@@ -22,9 +25,19 @@ from aws_cdk.aws_lambda import Runtime
 
 from aws_cdk.aws_ssm import StringParameter
 
+from aws_cdk.aws_s3_assets import Asset
+
+from aws_cdk.custom_resources import AwsCustomResource
+from aws_cdk.custom_resources import AwsCustomResourcePolicy
+from aws_cdk.custom_resources import AwsSdkCall
+from aws_cdk.custom_resources import PhysicalResourceId
+
+from aws_cdk.aws_logs import RetentionDays
+
 
 class StepFunction(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+
         super().__init__(scope, construct_id, **kwargs)
 
         event_channel = SlackChannelConfiguration(
@@ -81,12 +94,59 @@ class StepFunction(Stack):
             ]
         )
 
+        lambda_asset = Asset(
+            self,
+            'LambdaAsset',
+            path='runtime/lambda/',
+        )
+
+        slack_text = json.dumps(
+             {
+                 'text': 'asset hash updated, custom event triggered, update message'
+             }
+        )
+
+        event_bus = EventBus.from_event_bus_arn(
+            self,
+            'DefaultBust',
+            'arn:aws:events:us-west-2:618537831167:event-bus/default',
+        )
+
+        put_custom_event = AwsCustomResource(
+            self,
+            'PutCustomEvent',
+            on_update=AwsSdkCall(
+                service='EventBridge',
+                action='putEvents',
+                parameters={
+                    'Entries': [
+                        {
+                            'DetailType': 'CustomEvent',
+                            'Source': 'some.custom.event',
+                            'Detail': slack_text,
+                        }
+                    ]
+                },
+                physical_resource_id=PhysicalResourceId.of(
+                    lambda_asset.asset_hash
+                )
+            ),
+            log_retention=RetentionDays.ONE_DAY,
+            policy=AwsCustomResourcePolicy.from_sdk_calls(
+                resources=[
+                    event_bus.event_bus_arn,
+                ]
+            )
+        )
+
+        event_bus.grant_put_events_to(put_custom_event)
+
 
 app = App()
 
 StepFunction(
     app,
-    'StepFunction',
+    'StepFunction2',
     env=US_WEST_2,
 )
 
