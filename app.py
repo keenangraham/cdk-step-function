@@ -61,7 +61,7 @@ class StepFunction(Stack):
                 input=CodePipelineSource.connection(
                     'keenangraham/cdk-step-function',
                     'main',
-                    connection_arn='arn:aws:codestar-connections:us-east-1:618537831167:connection/28ec4d05-97dd-4730-b41c-b3b698b2a485'
+                    connection_arn='arn:aws:codestar-connections:us-west-2:618537831167:connection/e879dab8-2420-4646-ada7-ba7e04b3a1d2',
                 ),
                 commands=[
                     'npm install -g aws-cdk@2.21',
