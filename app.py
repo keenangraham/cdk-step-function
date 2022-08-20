@@ -98,7 +98,7 @@ step = StepFunction(
 
 Tags.of(step).add(
     'test',
-    'tag5',
+    'tag6',
 #    include_resource_types=['AWS::CloudFormation::Stack'],
     exclude_resource_types=['AWS::CodeStarNotifications::NotificationRule']
 )
