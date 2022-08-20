@@ -80,7 +80,7 @@ class StepFunction(Stack):
             'encode-dcc-aws-chatbot',
             slack_channel_configuration_name='aws-chatbot',
             slack_workspace_id='T1KMV4JJZ',
-            slack_channel_id='C03TCFF0MTM',
+            slack_channel_id='C034GTRCCLU',
         )
         pipeline.pipeline.notify_on_execution_state_change(
             'NotifyTest',
