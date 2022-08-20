@@ -17,6 +17,8 @@ from aws_cdk.pipelines import ShellStep
 from aws_cdk.pipelines import CodePipelineSource
 from aws_cdk import Tags
 
+from aws_cdk.aws_chatbot import SlackChannelConfiguration
+
 
 class StepFunction(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
@@ -69,6 +71,20 @@ class StepFunction(Stack):
                     'cdk synth',
                 ]
             )
+        )
+
+        pipeline.build_pipeline()
+
+        chatbot = SlackChannelConfiguration(
+            self,
+            'encode-dcc-aws-chatbot',
+            slack_channel_configuration_name='aws-chatbot',
+            slack_workspace_id='T1KMV4JJZ',
+            slack_channel_id='C03TCFF0MTM',
+        )
+        pipeline.pipeline.notify_on_execution_state_change(
+            'NotifyTest',
+            chatbot
         )
 
 
