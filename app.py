@@ -66,7 +66,7 @@ class StepFunction(Stack):
                     connection_arn='arn:aws:codestar-connections:us-west-2:618537831167:connection/077647ff-f9ef-406e-8392-e092848590f8'
                 ),
                 commands=[
-                    'npm install -g aws-cdk@2.21',
+                    'npm install -g aws-cdk@2.38.1',
                     'pip install -r requirements.txt -r requirements-dev.txt',
                     'cdk synth',
                 ]
