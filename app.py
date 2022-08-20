@@ -82,7 +82,7 @@ step = StepFunction(
 
 Tags.of(step).add(
     'test',
-    'tag2',
+    'tag3',
 )
 
 app.synth()
