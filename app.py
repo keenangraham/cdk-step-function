@@ -66,7 +66,7 @@ class StepFunction(Stack):
                 commands=[
                     'npm install -g aws-cdk@2.21',
                     'pip install -r requirements.txt -r requirements-dev.txt',
-                    'cdk synth'
+                    'cdk synth',
                 ]
             )
         )
