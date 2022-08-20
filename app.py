@@ -12,6 +12,11 @@ from constructs import Construct
 
 from shared_infrastructure.cherry_lab.environments import US_WEST_2
 
+from aws_cdk.pipelines import CodePipeline
+from aws_cdk.pipelines import ShellStep
+from aws_cdk.pipelines import CodePipelineSource
+from aws_cdk import Tags
+
 
 class StepFunction(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
@@ -47,15 +52,37 @@ class StepFunction(Stack):
             definition=definition
         )
 
-        
+        pipeline = CodePipeline(
+            self,
+            'Pipeline',
+            self_mutation=True,
+            synth=ShellStep(
+                'Synth',
+                input=CodePipelineSource.connection(
+                    'keenangraham/cdk-step-function',
+                    'main',
+                    connection_arn='arn:aws:codestar-connections:us-east-1:618537831167:connection/28ec4d05-97dd-4730-b41c-b3b698b2a485'
+                ),
+                commands=[
+                    'npm install -g aws-cdk@2.21',
+                    'pip install -r requirements.txt -r requirements-dev.txt'
+                    'cdk synth'
+                ]
+            )
+        )
 
 
 app = App()
 
-StepFunction(
+step = StepFunction(
     app,
     'StepFunction',
     env=US_WEST_2,
+)
+
+Tags.of(step).add(
+    'test',
+    'tag',
 )
 
 app.synth()
