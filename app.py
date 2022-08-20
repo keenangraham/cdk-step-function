@@ -99,8 +99,8 @@ step = StepFunction(
 Tags.of(step).add(
     'test',
     'tag5',
-    include_resource_types=['AWS::CloudFormation::Stack'],
-#    exclude_resource_types=['AWS::CodeStarNotifications::NotificationRule']
+#    include_resource_types=['AWS::CloudFormation::Stack'],
+    exclude_resource_types=['AWS::CodeStarNotifications::NotificationRule']
 )
 
 app.synth()
