@@ -7,6 +7,8 @@ from aws_cdk.aws_stepfunctions import Wait
 from aws_cdk.aws_stepfunctions import WaitTime
 from aws_cdk.aws_stepfunctions import Succeed
 from aws_cdk.aws_stepfunctions import StateMachine
+from aws_cdk.aws_stepfunctions import LogOptions
+from aws_cdk.aws_stepfunctions import LogLevel
 
 from aws_cdk.aws_stepfunctions_tasks import CallAwsService
 
@@ -14,10 +16,18 @@ from constructs import Construct
 
 from shared_infrastructure.cherry_lab.environments import US_WEST_2
 
+from aws_cdk.aws_logs import LogGroup
+from aws_cdk import RemovalPolicy
 
 class StepFunction(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        log_group = LogGroup(
+            self,
+            'LogGroup',
+            removal_policy=RemovalPolicy.DESTROY,
+        )
 
         wait_five_seconds = Wait(
             self,
@@ -37,22 +47,27 @@ class StepFunction(Stack):
             'Succeed',
         )
 
-        list_stacks = CallAwsService(
+        describe_stacks = CallAwsService(
             self,
-            'ListStacks',
+            'DescribeStacks',
             service='cloudformation',
-            action='listStacks',
-            iam_resources=['arn:aws:cloudformation:*']
+            action='describeStacks',
+            iam_resources=['arn:aws:cloudformation:*'],
         )
 
-        definition = list_stacks.next(
+        definition = describe_stacks.next(
             succeed
         )
 
         state_machine = StateMachine(
             self,
             'StateMachine',
-            definition=definition
+            definition=definition,
+            logs=LogOptions(
+                destination=log_group,
+                level=LogLevel.ALL,
+                include_execution_data=True,
+            )
         )
 
 
