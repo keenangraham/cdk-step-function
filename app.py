@@ -9,6 +9,10 @@ from aws_cdk.aws_stepfunctions import Succeed
 from aws_cdk.aws_stepfunctions import StateMachine
 from aws_cdk.aws_stepfunctions import LogOptions
 from aws_cdk.aws_stepfunctions import LogLevel
+from aws_cdk.aws_stepfunctions import Map
+from aws_cdk.aws_stepfunctions import Choice
+from aws_cdk.aws_stepfunctions import JsonPath
+from aws_cdk.aws_stepfunctions import Condition
 
 from aws_cdk.aws_stepfunctions_tasks import CallAwsService
 
@@ -42,6 +46,16 @@ class StepFunction(Stack):
             'NoOp',
         )
 
+        yes = Pass(
+            self,
+            'Yes',
+        )
+
+        no = Pass(
+            self,
+            'No',
+        )
+
         succeed = Succeed(
             self,
             'Succeed',
@@ -52,10 +66,36 @@ class StepFunction(Stack):
             'DescribeStacks',
             service='cloudformation',
             action='describeStacks',
-            iam_resources=['arn:aws:cloudformation:*'],
+            iam_resources=['*'],
         )
 
+        map_stacks = Map(
+            self,
+            'MapStacks',
+            max_concurrency=5,
+            items_path=JsonPath.string_at(
+                '$.Stacks'
+            )
+        )
+
+        create_complete = Choice(
+            self,
+            'CreationComplete',
+        ).when(
+            Condition.string_equals(
+                '$.StackStatus',
+                'CREATE_COMPLETE',
+            ),
+            yes
+        ).otherwise(
+            no
+        )
+
+        map_stacks.iterator(create_complete)
+
         definition = describe_stacks.next(
+            map_stacks
+        ).next(
             succeed
         )
 
