@@ -23,6 +23,23 @@ from shared_infrastructure.cherry_lab.environments import US_WEST_2
 from aws_cdk.aws_logs import LogGroup
 from aws_cdk import RemovalPolicy
 
+okay_statuses = [
+    "CREATE_FAILED",
+    "CREATE_COMPLETE",
+    "ROLLBACK_FAILED",
+    "ROLLBACK_COMPLETE",
+    "DELETE_FAILED",
+    "DELETE_COMPLETE",
+    "UPDATE_COMPLETE",
+    "UPDATE_FAILED",
+    "UPDATE_ROLLBACK_FAILED",
+    "UPDATE_ROLLBACK_COMPLETE",
+    "IMPORT_COMPLETE",
+    "IMPORT_ROLLBACK_FAILED",
+    "IMPORT_ROLLBACK_COMPLETE"
+  ]
+
+
 class StepFunction(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -78,20 +95,27 @@ class StepFunction(Stack):
             )
         )
 
-        create_complete = Choice(
+        status_conditions = Condition.or_(
+            *[
+                Condition.string_equals(
+                    '$.StackStatus',
+                    status
+                )
+                for status in okay_statuses
+            ]
+        )
+
+        status_okay = Choice(
             self,
-            'CreationComplete',
+            'StatusOkay',
         ).when(
-            Condition.string_equals(
-                '$.StackStatus',
-                'CREATE_COMPLETE',
-            ),
+            status_conditions,
             yes
         ).otherwise(
             no
         )
 
-        map_stacks.iterator(create_complete)
+        map_stacks.iterator(status_okay)
 
         definition = describe_stacks.next(
             map_stacks
