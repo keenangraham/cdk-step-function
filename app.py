@@ -16,6 +16,9 @@ from aws_cdk.aws_stepfunctions import Condition
 
 from aws_cdk.aws_stepfunctions_tasks import CallAwsService
 
+from aws_cdk.aws_lambda_python_alpha import PythonFunction
+from aws_cdk.aws_lambda import Runtime
+
 from constructs import Construct
 
 from shared_infrastructure.cherry_lab.environments import US_WEST_2
@@ -48,6 +51,26 @@ class StepFunction(Stack):
             self,
             'LogGroup',
             removal_policy=RemovalPolicy.DESTROY,
+        )
+
+        get_stacks_to_delete = PythonFunction(
+            self,
+            'GetStacksToDelete',
+            entry='cdk_step_function/runtime/cloudformation',
+            runtime=Runtime.PYTHON_3_9,
+            index='stacks.py',
+            handler='get_stacks_to_delete',
+            timeout=Duration.seconds(60),
+        )
+
+        increment_counter = PythonFunction(
+            self,
+            'IncrementCounter',
+            entry='cdk_step_function/runtime/counter/',
+            runtime=Runtime.PYTHON_3_9,
+            index='increment.py',
+            handler='increment_counter',
+            timeout=Duration.seconds(60),
         )
 
         wait_five_seconds = Wait(
