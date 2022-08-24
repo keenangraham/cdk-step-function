@@ -42,6 +42,7 @@ class StepFunction(Stack):
             'ListStacks',
             service='cloudformation',
             action='listStacks',
+            iam_resources=['arn:aws:cloudformation:*']
         )
 
         definition = list_stacks.next(
