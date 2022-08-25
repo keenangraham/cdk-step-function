@@ -1,7 +1,12 @@
 import boto3
+import logging
 
 from datetime import datetime
 from datetime import timezone
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 OKAY_STATUSES = [
@@ -26,7 +31,7 @@ SECONDS_IN_AN_HOUR = 3600
 
 
 def get_cloudformation_client():
-    return boto3.client('cloudformation')
+    return boto3.Session(profile_name='igvf-dev').client('cloudformation')
 
 
 def get_describe_stacks_paginator(client):
@@ -86,7 +91,7 @@ def try_parse_time_to_live_hours_tag(tag):
     try:
         return int(tag['Value'])
     except ValueError:
-        print('Tag value not int')
+        logger.warn('Tag value not int')
 
 
 def get_current_time():
@@ -97,11 +102,18 @@ def time_to_live_hours_exceeded(creation_time, time_to_live_hours):
     now = get_current_time()
     then = creation_time
     delta = now - then
-    hours_alive = delta.seconds // SECONDS_IN_AN_HOUR
+    hours_alive = int(delta.total_seconds() // SECONDS_IN_AN_HOUR)
+    logger.info(f'creation time: {then}')
+    logger.info(f'now: {now}')
+    logger.info(f'hours to live: {time_to_live_hours}')
+    logger.info(f'hours alive: {hours_alive}')
     return hours_alive >= time_to_live_hours
 
 
 def stack_is_alive_longer_than_time_to_live_hours(stack):
+    logger.info(
+        f'Checking if {get_stack_name(stack)} is alive longer than time to live hours'
+    )
     creation_time = get_creation_time(
         stack
     )
