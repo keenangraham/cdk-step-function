@@ -93,6 +93,11 @@ class StepFunction(Stack):
             )
         )
 
+        stack_does_not_exist = Pass(
+            self,
+            'StackDoesNotExist',
+        )
+
         describe_stack = CallAwsService(
             self,
             'DescribeStacks',
@@ -102,6 +107,13 @@ class StepFunction(Stack):
             parameters={
                 'StackName.$': '$'
             }
+        )
+
+        describe_stack.add_catch(
+            stack_does_not_exist,
+            errors=[
+                'CloudFormation.CloudFormationException'
+            ]
         )
 
         delete_stack = CallAwsService(
