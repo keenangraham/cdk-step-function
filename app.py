@@ -15,7 +15,10 @@ from aws_cdk.aws_stepfunctions import Choice
 from aws_cdk.aws_stepfunctions import JsonPath
 from aws_cdk.aws_stepfunctions import Condition
 
+from aws_cdk.aws_iam import PolicyStatement
+
 from aws_cdk.aws_stepfunctions_tasks import CallAwsService
+from aws_cdk.aws_stepfunctions_tasks import LambdaInvoke
 
 from aws_cdk.aws_lambda_python_alpha import PythonFunction
 from aws_cdk.aws_lambda import Runtime
@@ -26,22 +29,6 @@ from shared_infrastructure.cherry_lab.environments import US_WEST_2
 
 from aws_cdk.aws_logs import LogGroup
 from aws_cdk import RemovalPolicy
-
-okay_statuses = [
-    "CREATE_FAILED",
-    "CREATE_COMPLETE",
-    "ROLLBACK_FAILED",
-    "ROLLBACK_COMPLETE",
-    "DELETE_FAILED",
-    "DELETE_COMPLETE",
-    "UPDATE_COMPLETE",
-    "UPDATE_FAILED",
-    "UPDATE_ROLLBACK_FAILED",
-    "UPDATE_ROLLBACK_COMPLETE",
-    "IMPORT_COMPLETE",
-    "IMPORT_ROLLBACK_FAILED",
-    "IMPORT_ROLLBACK_COMPLETE"
-  ]
 
 
 
@@ -70,6 +57,18 @@ class StepFunction(Stack):
             timeout=Duration.seconds(60),
         )
 
+        get_stacks_to_delete.role.add_to_policy(
+            PolicyStatement(
+                actions=['cloudformation:DescribeStacks'],
+                resources=['*'],
+            )
+        )
+
+        no_op = Pass(
+            self,
+            'NoOp',
+        )
+
         increment_counter = PythonFunction(
             self,
             'IncrementCounter',
@@ -80,32 +79,18 @@ class StepFunction(Stack):
             timeout=Duration.seconds(60),
         )
 
+        call_get_stacks_to_delete = LambdaInvoke(
+            self,
+            'CallGetStacksToDelete',
+            lambda_function=get_stacks_to_delete,
+        )
+
         wait_five_seconds = Wait(
             self,
             'WaitFiveSeconds',
             time=WaitTime.duration(
                 Duration.seconds(5)
             )
-        )
-
-        no_op = Pass(
-            self,
-            'NoOp',
-        )
-
-        yes = Pass(
-            self,
-            'Yes',
-        )
-
-        no = Pass(
-            self,
-            'No',
-        )
-
-        succeed = Succeed(
-            self,
-            'Succeed',
         )
 
         describe_stacks = CallAwsService(
@@ -119,35 +104,18 @@ class StepFunction(Stack):
         map_stacks = Map(
             self,
             'MapStacks',
+            items_path='$.Payload',
             max_concurrency=5,
-            items_path=JsonPath.string_at(
-                '$.Stacks'
-            )
         )
 
-        status_conditions = Condition.or_(
-            *[
-                Condition.string_equals(
-                    '$.StackStatus',
-                    status
-                )
-                for status in okay_statuses
-            ]
-        )
-
-        status_okay = Choice(
+        succeed = Succeed(
             self,
-            'StatusOkay',
-        ).when(
-            status_conditions,
-            yes
-        ).otherwise(
-            no
+            'Succeed',
         )
 
-        map_stacks.iterator(status_okay)
+        map_stacks.iterator(no_op)
 
-        definition = describe_stacks.next(
+        definition = call_get_stacks_to_delete.next(
             map_stacks
         ).next(
             succeed

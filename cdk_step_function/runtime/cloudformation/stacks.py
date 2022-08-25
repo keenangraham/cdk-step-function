@@ -5,7 +5,7 @@ from datetime import datetime
 from datetime import timezone
 
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, force=True)
 logger = logging.getLogger(__name__)
 
 
