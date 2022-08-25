@@ -85,20 +85,41 @@ class StepFunction(Stack):
             lambda_function=get_stacks_to_delete,
         )
 
-        wait_five_seconds = Wait(
+        wait_ten_seconds = Wait(
             self,
-            'WaitFiveSeconds',
+            'WaitTenSeconds',
             time=WaitTime.duration(
-                Duration.seconds(5)
+                Duration.seconds(10)
             )
         )
 
-        describe_stacks = CallAwsService(
+        describe_stack = CallAwsService(
             self,
             'DescribeStacks',
             service='cloudformation',
             action='describeStacks',
             iam_resources=['*'],
+            parameters={
+                'StackName.$': '$'
+            }
+        )
+
+        delete_stack = CallAwsService(
+            self,
+            'DeleteStack',
+            service='cloudformation',
+            action='deleteStack',
+            iam_resources=['*'],
+            parameters={
+                'StackName.$': '$'
+            },
+            result_path=JsonPath.DISCARD,
+        )
+
+        clean_up_routine = delete_stack.next(
+            wait_ten_seconds
+        ).next(
+            describe_stack
         )
 
         map_stacks = Map(
@@ -113,7 +134,7 @@ class StepFunction(Stack):
             'Succeed',
         )
 
-        map_stacks.iterator(no_op)
+        map_stacks.iterator(clean_up_routine.next(no_op))
 
         definition = call_get_stacks_to_delete.next(
             map_stacks
