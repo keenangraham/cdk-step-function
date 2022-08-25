@@ -128,7 +128,9 @@ def filter_stacks_living_longer_than_time_to_live_hours(stacks):
 
 
 def get_stacks_to_delete_because_of_time_to_live_hours_tag():
-    stacks = get_all_stacks()
+    client = get_cloudformation_client()
+    paginator = get_describe_stacks_paginator(client)
+    stacks = get_all_stacks(paginator)
     stacks = filter_stacks_by_statuses(stacks)
     stacks = filter_stacks_with_time_to_live_hours_tag(stacks)
     stacks = filter_stacks_living_longer_than_time_to_live_hours(stacks)
