@@ -31,7 +31,7 @@ SECONDS_IN_AN_HOUR = 3600
 
 
 def get_cloudformation_client():
-    return boto3.Session(profile_name='igvf-dev').client('cloudformation')
+    return boto3.client('cloudformation')
 
 
 def get_describe_stacks_paginator(client):
@@ -98,15 +98,19 @@ def get_current_time():
     return datetime.now(timezone.utc)
 
 
+def log_time_info(now, then, time_to_live_hours, hours_alive):
+    logger.info(f'creation time: {then}')
+    logger.info(f'now: {now}')
+    logger.info(f'hours to live: {time_to_live_hours}')
+    logger.info(f'hours alive: {hours_alive}')
+
+
 def time_to_live_hours_exceeded(creation_time, time_to_live_hours):
     now = get_current_time()
     then = creation_time
     delta = now - then
     hours_alive = int(delta.total_seconds() // SECONDS_IN_AN_HOUR)
-    logger.info(f'creation time: {then}')
-    logger.info(f'now: {now}')
-    logger.info(f'hours to live: {time_to_live_hours}')
-    logger.info(f'hours alive: {hours_alive}')
+    log_time_info(now, then, time_to_live_hours, hours_alive)
     return hours_alive >= time_to_live_hours
 
 
@@ -173,4 +177,5 @@ def get_stacks_to_delete(event, context):
     unique_stack_names_to_delete.update(
         stack_names_to_delete
     )
+    logger.info(f'Stacks to delete: {unique_stack_names_to_delete}')
     return list(unique_stack_names_to_delete)
