@@ -1,6 +1,7 @@
 from aws_cdk import App
 from aws_cdk import Stack
 from aws_cdk import Duration
+from aws_cdk import Tags
 
 from aws_cdk.aws_stepfunctions import Pass
 from aws_cdk.aws_stepfunctions import Wait
@@ -41,6 +42,12 @@ okay_statuses = [
     "IMPORT_ROLLBACK_FAILED",
     "IMPORT_ROLLBACK_COMPLETE"
   ]
+
+
+
+class StackToDelete(Stack):
+    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+        super().__init__(scope, construct_id, **kwargs)
 
 
 class StepFunction(Stack):
@@ -164,6 +171,17 @@ step = StepFunction(
     app,
     'StepFunction',
     env=US_WEST_2,
+)
+
+delme = StackToDelete(
+    app,
+    'StackToDelete',
+    env=US_WEST_2,
+)
+
+
+Tags.of(delme).add(
+    'time-to-live-hours', '-1'
 )
 
 
