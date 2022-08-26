@@ -3,10 +3,13 @@ from aws_cdk import Stack
 from aws_cdk import Duration
 from aws_cdk import Tags
 
+from aws_cdk.aws_ssm import StringParameter
+
 from aws_cdk.aws_stepfunctions import Pass
 from aws_cdk.aws_stepfunctions import Wait
 from aws_cdk.aws_stepfunctions import WaitTime
 from aws_cdk.aws_stepfunctions import Succeed
+from aws_cdk.aws_stepfunctions import Fail
 from aws_cdk.aws_stepfunctions import StateMachine
 from aws_cdk.aws_stepfunctions import LogOptions
 from aws_cdk.aws_stepfunctions import LogLevel
@@ -33,9 +36,25 @@ from aws_cdk import RemovalPolicy
 
 
 
-class StackToDelete(Stack):
+class ProducerToDelete(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
+        self.value = StringParameter(
+            self,
+            'ProducerValue',
+            string_value='ProducerValue'
+        )
+
+
+class ConsumerToDelete(Stack):
+    def __init__(self, scope: Construct, construct_id: str, producer: Stack, **kwargs) -> None:
+        super().__init__(scope, construct_id, **kwargs)
+        self.producer = producer
+        StringParameter(
+            self,
+            'SomeReferenceValue',
+            string_value=self.producer.value.parameter_arn
+        )
 
 
 class StepFunction(Stack):
@@ -47,6 +66,8 @@ class StepFunction(Stack):
             'LogGroup',
             removal_policy=RemovalPolicy.DESTROY,
         )
+
+        self.log_group = log_group
 
         succeed = Succeed(
             self,
@@ -70,9 +91,14 @@ class StepFunction(Stack):
             )
         )
 
-        loop_done = Pass(
+        delete_sucessful = Succeed(
             self,
-            'LoopDone',
+            'DeleteSuccessful'
+        )
+
+        unable_to_delete = Pass(
+            self,
+            'UnableToDelete'
         )
 
         increment_counter_lambda = PythonFunction(
@@ -128,9 +154,9 @@ class StepFunction(Stack):
             )
         )
 
-        should_continue_loop = Choice(
+        should_try_again = Choice(
             self,
-            'ShouldContinueLoop'
+            'ShouldTryAgain'
         ).when(
             Condition.boolean_equals(
                 '$.iterator.continue',
@@ -138,17 +164,12 @@ class StepFunction(Stack):
             ),
             increment_counter
         ).otherwise(
-            loop_done
+            unable_to_delete
         )
 
-        stack_does_not_exist = Pass(
+        does_stack_exist = CallAwsService(
             self,
-            'StackDoesNotExist',
-        )
-
-        describe_stack = CallAwsService(
-            self,
-            'DescribeStacks',
+            'DoesStackExist',
             service='cloudformation',
             action='describeStacks',
             iam_resources=['*'],
@@ -157,8 +178,8 @@ class StepFunction(Stack):
             }
         )
 
-        describe_stack.add_catch(
-            stack_does_not_exist,
+        does_stack_exist.add_catch(
+            delete_sucessful,
             errors=[
                 'CloudFormation.CloudFormationException'
             ]
@@ -176,10 +197,21 @@ class StepFunction(Stack):
             result_path=JsonPath.DISCARD,
         )
 
+        delete_stack.add_catch(
+            unable_to_delete,
+            errors=[
+                'CloudFormation.CloudFormationException'
+            ]
+        )
+
         clean_up_routine = increment_counter.next(
+            delete_stack
+        ).next(
             wait_ten_seconds
         ).next(
-            should_continue_loop
+            does_stack_exist
+        ).next(
+            should_try_again
         )
 
         map_stacks = Map(
@@ -223,14 +255,25 @@ step = StepFunction(
     env=US_WEST_2,
 )
 
-delme = StackToDelete(
+producer = ProducerToDelete(
     app,
-    'StackToDelete',
+    'ProducerToDelete',
+    env=US_WEST_2,
+)
+
+consumer = ConsumerToDelete(
+    app,
+    'ConsumerToDelete2',
+    producer=producer,
     env=US_WEST_2,
 )
 
 
-Tags.of(delme).add(
+Tags.of(producer).add(
+    'time-to-live-hours', '-1'
+)
+
+Tags.of(consumer).add(
     'time-to-live-hours', '-1'
 )
 
