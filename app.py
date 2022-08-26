@@ -115,8 +115,9 @@ class StepFunction(Stack):
             self,
             'GetStacksToDelete',
             lambda_function=get_stacks_to_delete_lambda,
+            payload_response_only=True,
             result_selector={
-                'stacks_to_delete.$': '$.Payload'
+                'stacks_to_delete.$': '$'
             }
         )
 
@@ -137,12 +138,7 @@ class StepFunction(Stack):
             self,
             'IncrementCounter',
             lambda_function=increment_counter_lambda,
-            result_selector={
-                'index.$': '$.Payload.index',
-                'step.$': '$.Payload.step',
-                'count.$': '$.Payload.count',
-                'continue.$': '$.Payload.continue',
-            },
+            payload_response_only=True,
             result_path='$.iterator',
         )
 
@@ -175,7 +171,8 @@ class StepFunction(Stack):
             iam_resources=['*'],
             parameters={
                 'StackName.$': '$.stack_to_delete'
-            }
+            },
+            result_path=JsonPath.DISCARD,
         )
 
         does_stack_exist.add_catch(
