@@ -14,6 +14,7 @@ from aws_cdk.aws_stepfunctions import Map
 from aws_cdk.aws_stepfunctions import Choice
 from aws_cdk.aws_stepfunctions import JsonPath
 from aws_cdk.aws_stepfunctions import Condition
+from aws_cdk.aws_stepfunctions import Result
 
 from aws_cdk.aws_iam import PolicyStatement
 
@@ -47,9 +48,14 @@ class StepFunction(Stack):
             removal_policy=RemovalPolicy.DESTROY,
         )
 
-        get_stacks_to_delete = PythonFunction(
+        succeed = Succeed(
             self,
-            'GetStacksToDelete',
+            'Succeed',
+        )
+
+        get_stacks_to_delete_lambda = PythonFunction(
+            self,
+            'GetStacksToDeleteLambda',
             entry='cdk_step_function/runtime/cloudformation',
             runtime=Runtime.PYTHON_3_9,
             index='stacks.py',
@@ -57,21 +63,21 @@ class StepFunction(Stack):
             timeout=Duration.seconds(60),
         )
 
-        get_stacks_to_delete.role.add_to_policy(
+        get_stacks_to_delete_lambda.role.add_to_policy(
             PolicyStatement(
                 actions=['cloudformation:DescribeStacks'],
                 resources=['*'],
             )
         )
 
-        no_op = Pass(
+        loop_done = Pass(
             self,
-            'NoOp',
+            'LoopDone',
         )
 
-        increment_counter = PythonFunction(
+        increment_counter_lambda = PythonFunction(
             self,
-            'IncrementCounter',
+            'IncrementCounterLambda',
             entry='cdk_step_function/runtime/counter/',
             runtime=Runtime.PYTHON_3_9,
             index='increment.py',
@@ -79,10 +85,39 @@ class StepFunction(Stack):
             timeout=Duration.seconds(60),
         )
 
-        call_get_stacks_to_delete = LambdaInvoke(
+        get_stacks_to_delete = LambdaInvoke(
             self,
-            'CallGetStacksToDelete',
-            lambda_function=get_stacks_to_delete,
+            'GetStacksToDelete',
+            lambda_function=get_stacks_to_delete_lambda,
+            result_selector={
+                'stacks_to_delete.$': '$.Payload'
+            }
+        )
+
+        initialize_counter = Pass(
+            self,
+            'InitializeCounter',
+            result=Result.from_object(
+                {
+                    'index': 0,
+                    'step': 1,
+                    'count': 3,
+                }
+            ),
+            result_path='$.iterator',
+        )
+
+        increment_counter = LambdaInvoke(
+            self,
+            'IncrementCounter',
+            lambda_function=increment_counter_lambda,
+            result_selector={
+                'index.$': '$.Payload.index',
+                'step.$': '$.Payload.step',
+                'count.$': '$.Payload.count',
+                'continue.$': '$.Payload.continue',
+            },
+            result_path='$.iterator',
         )
 
         wait_ten_seconds = Wait(
@@ -91,6 +126,19 @@ class StepFunction(Stack):
             time=WaitTime.duration(
                 Duration.seconds(10)
             )
+        )
+
+        should_continue_loop = Choice(
+            self,
+            'ShouldContinueLoop'
+        ).when(
+            Condition.boolean_equals(
+                '$.iterator.continue',
+                True
+            ),
+            increment_counter
+        ).otherwise(
+            loop_done
         )
 
         stack_does_not_exist = Pass(
@@ -105,7 +153,7 @@ class StepFunction(Stack):
             action='describeStacks',
             iam_resources=['*'],
             parameters={
-                'StackName.$': '$'
+                'StackName.$': '$.stack_to_delete'
             }
         )
 
@@ -123,32 +171,33 @@ class StepFunction(Stack):
             action='deleteStack',
             iam_resources=['*'],
             parameters={
-                'StackName.$': '$'
+                'StackName.$': '$.stack_to_delete'
             },
             result_path=JsonPath.DISCARD,
         )
 
-        clean_up_routine = delete_stack.next(
+        clean_up_routine = increment_counter.next(
             wait_ten_seconds
         ).next(
-            describe_stack
+            should_continue_loop
         )
 
         map_stacks = Map(
             self,
             'MapStacks',
-            items_path='$.Payload',
+            items_path='$.stacks_to_delete',
             max_concurrency=5,
+            parameters={
+                'stack_to_delete.$': '$$.Map.Item.Value',
+                'iterator.$': '$.iterator'
+            }
         )
 
-        succeed = Succeed(
-            self,
-            'Succeed',
-        )
+        map_stacks.iterator(clean_up_routine)
 
-        map_stacks.iterator(clean_up_routine.next(no_op))
-
-        definition = call_get_stacks_to_delete.next(
+        definition = get_stacks_to_delete.next(
+            initialize_counter
+        ).next(
             map_stacks
         ).next(
             succeed
